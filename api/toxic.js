@@ -2,7 +2,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { STICKERS } from "./_stickers.js";
 
-// 👑 METS TON NUMÉRO ICI (sans le +, juste les chiffres. Exemple: "222XXXXXXXX")
+// 👑 METS TON NUMÉRO ICI
 const MASTER_NUMBER = "22395064497"; 
 
 export default async function handler(req, res) {
@@ -21,10 +21,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Initialisation standard du SDK Google
     const ai = new GoogleGenerativeAI(apiKey);
 
-    // Détection du Maître
     const isMaster = sender && sender.includes(MASTER_NUMBER);
 
     let systemInstruction = "";
@@ -34,20 +32,17 @@ export default async function handler(req, res) {
       systemInstruction = "Tu es un utilisateur Discord ultra-toxique, aigri, arrogant, blasé et condescendant. Tu parles comme un gamer frustré sur un serveur communautaire. Utilise le jargon : 'wsh', 'ratio', 'masterclass', 'askip', 'flemme', 't'es qui ?', 'chiale', 'clochard', 'le flop'. Écris un maximum en minuscules, fais des phrases courtes, sèches et piquantes. Ne sois JAMAIS poli ou amical. Ajoute parfois des émojis condescendants comme 💀, 🤡, 🤫, 😮‍💨.";
     }
 
-    // Récupération du modèle
+    // 🌟 CHANGEMENT DE MODÈLE ICI POUR PASSER SUR LA DERNIÈRE VERSION ACTIVE
     const model = ai.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.5-flash", // Mis à jour pour éviter le crash 404 de Google
       systemInstruction: systemInstruction,
     });
 
-    // Génération du contenu
     const result = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: text }] }]
     });
     
     const aiResponse = result.response.text().trim();
-
-    // Choix du sticker
     const randomSticker = STICKERS[Math.floor(Math.random() * STICKERS.length)];
 
     return res.status(200).json({
