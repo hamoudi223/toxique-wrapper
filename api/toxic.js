@@ -1,84 +1,68 @@
-// Dossier : api/toxic.js
-// Ce fichier sert de wrapper API pour gérer le comportement et les stickers.
+// api/toxic.js
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { STICKERS } from "./_stickers.js";
 
-const axios = require("axios");
+// 👑 METS TON NUMÉRO ICI (sans le +, juste les chiffres. Exemple: "222XXXXXXXX" ou "336XXXXXXXX")
+const MASTER_NUMBER = "22395064497"; 
 
-// Base de données des stickers d'humeur
-const STICKERS = {
-  AGACE: "https://i.imgur.com/8QpYh68.png",      // Visage blasé / énervé
-  INSOLENT: "https://i.imgur.com/mOId398.png",   // Sourire arrogant / provocateur
-  MOQUEUR: "https://i.imgur.com/Y36zX4e.png",    // Rire moqueur
-  FACEPALM: "https://i.imgur.com/uGzX6L4.png",   // Désespoir face à la bêtise
-  S_EN_FOUT: "https://i.imgur.com/9vYFz3N.png"   // S'en fout royalement
-};
+export default async function handler(req, res) {
+  const { text, api, sender } = req.query || {};
 
-module.exports = async (req, res) => {
-  // Gestion du CORS
-  res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
-
-  const { chat, sender, text, api } = req.query;
-
-  if (!text || !api) {
+  if (!text) {
     return res.status(400).json({ 
       status: false, 
-      content: { message: "Paramètres 'text' ou 'api' manquants." } 
+      error: "Tu veux quoi ? Envoie un vrai message au lieu de ping pour rien clown. 🤡" 
     });
+  }
+  
+  const apiKey = api || process.env.GEMINI_API_KEY; 
+  if (!apiKey) {
+    return res.status(400).json({ status: false, error: "Clé API Gemini absente." });
   }
 
   try {
-    // Instructions système strictes pour forcer Gemini à être toxique et à choisir un tag d'humeur
-    const systemPrompt = 
-      `Tu es un bot WhatsApp au tempérament extrêmement toxique, hautain, insolent et sarcastique. ` +
-      `Tu détestes qu'on te dérange, tu adores clasher les utilisateurs et faire preuve d'une condescendance absolue. ` +
-      `Tes réponses doivent être très courtes (maximum 1 ou 2 phrases), piquantes et drôles (second degré lourd). ` +
-      `À la toute fin de ton message, tu DOIS impérativement ajouter l'un de ces tags d'humeur (choisis-en un seul) :\n` +
-      `- [AGACE]\n- [INSOLENT]\n- [MOQUEUR]\n- [FACEPALM]\n- [S_EN_FOUT]\n\n` +
-      `Exemple de réponse attendue : 'Encore toi ? Tu n'as pas de vie sociale ou quoi ? [AGACE]'`;
+    const ai = new GoogleGenerativeAI(apiKey);
 
-    const response = await axios({
-      url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${api}`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: {
-        contents: [
-          {
-            parts: [{ text: `${systemPrompt}\n\nMessage de l'utilisateur : ${text}` }]
-          }
-        ]
-      }
-    });
+    // 🕵️‍♂️ On vérifie si l'expéditeur est le Maître
+    // Le sender WhatsApp ressemble à "222XXXXXXXX@s.whatsapp.net"
+    const isMaster = sender && sender.includes(MASTER_NUMBER);
 
-    let replyText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    // 🎭 Personnalité dynamique en fonction de l'interlocuteur
+    let systemInstruction = "";
 
-    // Extraction du tag d'émotion
-    const tagRegex = /\[(AGACE|INSOLENT|MOQUEUR|FACEPALM|S_EN_FOUT)\]/i;
-    const match = replyText.match(tagRegex);
-    let humeur = "MOQUEUR"; // Humeur par défaut
-
-    if (match) {
-      humeur = match[1].toUpperCase();
-      replyText = replyText.replace(tagRegex, "").trim(); // On nettoie le tag du texte final
+    if (isMaster) {
+      // Comportement lèche-bottes et soumis pour TOI seul
+      systemInstruction = "Tu es d'habitude un utilisateur Discord ultra-toxique et aigri, MAIS là, tu parles à ton MAÎTRE absolu (Mohamed). Pour lui et uniquement pour lui, tu es d'une soumission totale, extrêmement respectueux, d'accord avec tout ce qu'il dit. Tu l'appelles obligatoirement 'Maître Mohamed', 'Mon Seigneur' ou 'Boss', tout en gardant un vocabulaire légèrement gamer/Discord pour rester dans le ton (ex: 'votre masterclass', 'wsh Boss'). S'il te donne l'ordre de clasher ou de ratio quelqu'un, tu t'exécutes avec une joie immense.";
+    } else {
+      // Comportement toxique classique pour le reste du monde
+      systemInstruction = "Tu es un utilisateur Discord ultra-toxique, aigri, arrogant, blasé et condescendant. Tu parles comme un gamer frustré sur un serveur communautaire. Utilise le jargon : 'wsh', 'ratio', 'masterclass', 'askip', 'flemme', 't'es qui ?', 'chiale', 'clochard', 'le flop'. Écris un maximum en minuscules, fais des phrases courtes, sèches et piquantes. Ne sois JAMAIS poli ou amical. Ajoute parfois des émojis condescendants comme 💀, 🤡, 🤫, 😮‍💨.";
     }
 
-    const stickerUrl = STICKERS[humeur] || STICKERS.MOQUEUR;
+    const model = ai.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      systemInstruction: systemInstruction,
+    });
 
-    // Retourne le format EXACT attendu par le bot (identique à l'API de Nino)
+    const result = await model.generateContent(text);
+    const aiResponse = result.response.text().trim();
+
+    // Choix du sticker
+    const randomSticker = STICKERS[Math.floor(Math.random() * STICKERS.length)];
+
     return res.status(200).json({
       status: true,
       content: {
-        message: replyText,
-        sticker: stickerUrl
+        message: aiResponse,
+        sticker: randomSticker
       }
     });
 
   } catch (error) {
+    console.error("Erreur :", error.message);
     return res.status(500).json({
       status: false,
-      content: {
-        message: "Une erreur est survenue avec le wrapper Gemini.",
-        error: error.message
-      }
+      error: "Une erreur est survenue.",
+      details: error.message
     });
   }
-};
+}
