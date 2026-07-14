@@ -34,7 +34,7 @@ export default async function handler(req, res) {
 
     // 🌟 CHANGEMENT DE MODÈLE ICI POUR PASSER SUR LA DERNIÈRE VERSION ACTIVE
     const model = ai.getGenerativeModel({
-      model: "gemini-2.5-flash", // Mis à jour pour éviter le crash 404 de Google
+      model: "gemini-3.5-flash", // Mis à jour pour éviter le crash 404 de Google
       systemInstruction: systemInstruction,
     });
 
